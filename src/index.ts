@@ -1,9 +1,14 @@
 import {
   JupyterFrontEnd,
-  JupyterFrontEndPlugin
+  JupyterFrontEndPlugin,
+  ILayoutRestorer
 } from '@jupyterlab/application';
 
-import {ICommandPalette, MainAreaWidget} from '@jupyterlab/apputils';
+import {
+  ICommandPalette, 
+  MainAreaWidget,
+  WidgetTracker
+} from '@jupyterlab/apputils';
 
 import {Widget} from '@lumino/widgets';
 
@@ -71,28 +76,25 @@ class APODWidget extends Widget{
   }
 }
 
-function activate(app: JupyterFrontEnd, palette: ICommandPalette){
+function activate(app: JupyterFrontEnd, palette: ICommandPalette, restorer: ILayoutRestorer | null){
   console.log('JupyterLab extension jupyterlab_apod is activated!');
 
-  // widget creator function
-  const newWidget = () => {
-    const content = new APODWidget();
-    const widget = new MainAreaWidget({content});
-    widget.id = 'apod-jupyterlab';
-    widget.title.label = 'Astronomy Picture';
-    widget.title.closable = true;
-    return widget;
-  }
-
-  let widget = newWidget();
+  let widget: MainAreaWidget<APODWidget>;
 
   // command to open the widget
   const command: string = 'apod:open';
   app.commands.addCommand(command, {
     label: 'Random Astronomy Picture',
     execute: () => {
-      if (widget.isDisposed){
-        widget = newWidget();
+      if (!widget || widget.isDisposed){
+      const content = new APODWidget();
+      widget = new MainAreaWidget({content});
+      widget.id = 'apod-jupyterlab';
+      widget.title.label = 'Astronomy Picture';
+      widget.title.closable = true;
+      }
+      if (!tracker.has(widget)) {
+        tracker.add(widget);
       }
       if (!widget.isAttached) {
         app.shell.add(widget, 'main');
@@ -105,6 +107,17 @@ function activate(app: JupyterFrontEnd, palette: ICommandPalette){
 
   // add the command to the palette
   palette.addItem({command, category: 'Tutorial'});
+
+  // track the widget
+  let tracker = new WidgetTracker<MainAreaWidget<APODWidget>>({
+    namespace: 'apod'
+  });
+  if (restorer){
+    restorer.restore(tracker,{
+      command,
+      name: () => 'apod'
+    })
+  }
 }
 
 /**
@@ -115,6 +128,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
   description: 'A JupyterLab extension.',
   autoStart: true,
   requires: [ICommandPalette],
+  optional: [ILayoutRestorer],
   activate: activate
 }
 
